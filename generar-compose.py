@@ -62,8 +62,8 @@ if __name__ == "__main__":
         print(f"Error: la cantidad de clientes debe ser un número entero, se recibió '{sys.argv[2]}'")
         sys.exit(1)
 
-    if client_amount < 1:
-        print(f"Error: la cantidad de clientes debe ser mayor a 0, se recibió '{client_amount}'")
+    if client_amount < 0:
+        print(f"Error: la cantidad de clientes debe ser mayor o igual a 0, se recibió '{client_amount}'")
         sys.exit(1)
 
     generate_compose(output_file, client_amount)
