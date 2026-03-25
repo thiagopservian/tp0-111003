@@ -15,6 +15,8 @@ def generate_compose(output_file, client_amount):
     lines.append("    environment:")
     lines.append("      - PYTHONUNBUFFERED=1")
     lines.append("      - LOGGING_LEVEL=DEBUG")
+    lines.append("    volumes:")
+    lines.append("      - ./server/config.ini:/config.ini")
     lines.append("    networks:")
     lines.append("      - testing_net")
 
@@ -28,6 +30,8 @@ def generate_compose(output_file, client_amount):
         lines.append(f"    environment:")
         lines.append(f"      - CLI_ID={i}")
         lines.append(f"      - CLI_LOG_LEVEL=DEBUG")
+        lines.append(f"    volumes:")
+        lines.append(f"      - ./client/config.yaml:/config.yaml")
         lines.append(f"    networks:")
         lines.append(f"      - testing_net")
         lines.append(f"    depends_on:")
