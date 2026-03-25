@@ -4,6 +4,7 @@ from configparser import ConfigParser
 from common.server import Server
 import logging
 import os
+import signal
 
 
 def initialize_config():
@@ -49,6 +50,15 @@ def main():
 
     # Initialize server and start server loop
     server = Server(port, listen_backlog)
+
+    def _handle_termination_signal(signum, frame):
+        signal_name = signal.Signals(signum).name
+        logging.info(f"action: shutdown | result: success | signal: {signal_name}")
+        server.shutdown()
+
+    signal.signal(signal.SIGTERM, _handle_termination_signal)
+    signal.signal(signal.SIGINT, _handle_termination_signal)
+
     server.run()
 
 def initialize_log(logging_level):
