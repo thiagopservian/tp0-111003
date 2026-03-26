@@ -1,30 +1,66 @@
-# TP0 – Ejercicio 4
+# TP0 – Ejercicio 5
 
-Branch actual: ej4. Objetivo: finalizar cliente y servidor de forma graceful al recibir SIGTERM, cerrando sockets y registrando logs de cierre.
+Branch actual: ej5. Objetivo: implementar el caso de uso Lotería Nacional, enviando una apuesta desde cliente y almacenándola en servidor.
 
 ## Cómo correr el ejercicio
 
-- Generar el compose con la cantidad deseada de clientes: `./generar-compose.sh docker-compose-dev.yaml <cantidad_de_clientes>`.
-- Ajustar configuración antes de levantar:
-	- Cliente: [client/config.yaml](client/config.yaml) (loop_amount, loop_period, log.level, server.address).
-	- Servidor: [server/config.ini](server/config.ini) (port, listen_backlog, logging_level).
-- Construir imágenes **solo si cambiaste código** (los cambios de config no requieren rebuild): `make docker-image` o `docker build -f ./server/Dockerfile -t server:latest .` y `docker build -f ./client/Dockerfile -t client:latest .`.
-- Levantar entorno: `make docker-compose-up` o `docker compose -f docker-compose-dev.yaml up -d`.
-- Ver logs: `make docker-compose-logs` (usa `grep` para filtrar) o `docker compose -f docker-compose-dev.yaml logs -f`.
-- Probar apagado graceful:
-	- Cliente: `docker stop client1 -t 20`
-	- Servidor: `docker stop server -t 20`
-	- Todo el sistema: `docker compose -f docker-compose-dev.yaml down -t 10`
+- Generar compose: `./generar-compose.sh docker-compose-dev.yaml 5`.
+- Levantar entorno: `make docker-compose-up` (o `docker compose -f docker-compose-dev.yaml up -d`).
+- Ver logs: `make docker-compose-logs` (o `docker compose -f docker-compose-dev.yaml logs -f`).
 - Bajar entorno: `make docker-compose-down`.
+
+### Variables de entorno de la apuesta (cliente)
+
+Cada cliente/agencia envía una apuesta con:
+
+- `CLI_NOMBRE`
+- `CLI_APELLIDO`
+- `CLI_DOCUMENTO`
+- `CLI_NACIMIENTO` (formato `YYYY-MM-DD`)
+- `CLI_NUMERO`
+
+Además se usa `CLI_ID` como identificador de agencia.
 
 ## Detalles de la solución
 
-- Se usa `entrypoint` en formato exec en el compose generado para que SIGTERM llegue al proceso real (`/client` y `python3 /main.py`) y no a un shell intermedio.
-- Cliente (Go): maneja SIGTERM con `signal.NotifyContext`; ante cancelación corta el loop, cierra el socket activo y loguea `action: shutdown` y `action: close_socket`.
-- Servidor (Python): registra handler de SIGTERM/SIGINT; al recibir señal ejecuta `shutdown()`, cierra socket de cliente activo y socket de escucha, y sale del loop principal.
-- Se agregaron logs explícitos de cierre de recursos (`close_socket`) para verificar el cierre de file descriptors durante el apagado.
+### Modelo de comunicación / protocolo
+
+Se implementó un módulo de protocolo en ambos lados:
+
+- Cliente: [client/common/protocol.go](client/common/protocol.go)
+- Servidor: [server/common/protocol.py](server/common/protocol.py)
+
+Formato de mensaje:
+
+1. Header de 4 bytes big-endian con la longitud del payload.
+2. Payload en bytes con los campos serializados.
+
+Serialización de la apuesta (cliente → servidor):
+
+`agency\nnombre\napellido\ndocumento\nnacimiento\nnumero`
+
+Respuesta del servidor:
+
+- `OK` si se almacenó correctamente.
+- `ERROR` si el formato es inválido.
+
+### Manejo de short read / short write
+
+- En cliente (`SendAll`/`RecvAll`) y servidor (`send_all`/`recv_all`) se itera hasta enviar/recibir todos los bytes esperados.
+- Con esto se evita asumir que un solo `send`/`recv` transfiere el mensaje completo.
+
+### Separación de responsabilidades
+
+- Capa de protocolo: framing y transferencia confiable de bytes.
+- Lógica de negocio cliente: construcción de apuesta y log de confirmación.
+- Lógica de negocio servidor: parseo, validación básica de 6 campos, creación de `Bet` y persistencia con `store_bets(...)`.
+
+### Logs requeridos
+
+- Cliente, al confirmar: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+- Servidor, al persistir: `action: apuesta_almacenada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
 
 ## Tests
 
-- En `tp0-tests`, ejecutar `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej4.py -q` o `make test` desde esa carpeta. Asegúrate de tener docker accesible sin sudo.
+- En `tp0-tests`: `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej5.py -q`.
 
