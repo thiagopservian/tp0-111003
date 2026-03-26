@@ -67,7 +67,6 @@ func (c *Client) closeClientSocket() {
 	c.conn = nil
 }
 
-// SendBet sends the bet data to the server and waits for confirmation
 func (c *Client) SendBet(ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -81,7 +80,6 @@ func (c *Client) SendBet(ctx context.Context) {
 	}
 	defer c.closeClientSocket()
 
-	// Serialize bet fields: AGENCY\nNOMBRE\nAPELLIDO\nDOCUMENTO\nNACIMIENTO\nNUMERO
 	payload := strings.Join([]string{
 		c.config.ID,
 		c.config.Nombre,
@@ -91,7 +89,6 @@ func (c *Client) SendBet(ctx context.Context) {
 		c.config.Numero,
 	}, "\n")
 
-	// Send bet message
 	if err := SendMessage(c.conn, []byte(payload)); err != nil {
 		if ctx.Err() != nil {
 			log.Infof("action: shutdown | result: success | client_id: %v | signal: SIGTERM", c.config.ID)
@@ -101,7 +98,6 @@ func (c *Client) SendBet(ctx context.Context) {
 		return
 	}
 
-	// Receive confirmation
 	response, err := RecvMessage(c.conn)
 	if err != nil {
 		if ctx.Err() != nil {

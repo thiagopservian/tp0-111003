@@ -6,7 +6,6 @@ import (
 	"net"
 )
 
-// SendAll writes all bytes to the connection, avoiding short-write.
 func SendAll(conn net.Conn, data []byte) error {
 	for len(data) > 0 {
 		n, err := conn.Write(data)
@@ -18,7 +17,6 @@ func SendAll(conn net.Conn, data []byte) error {
 	return nil
 }
 
-// RecvAll reads exactly n bytes from the connection, avoiding short-read.
 func RecvAll(conn net.Conn, n int) ([]byte, error) {
 	buf := make([]byte, n)
 	offset := 0
@@ -32,7 +30,6 @@ func RecvAll(conn net.Conn, n int) ([]byte, error) {
 	return buf, nil
 }
 
-// SendMessage sends a length-prefixed message: 4 bytes big-endian length + payload.
 func SendMessage(conn net.Conn, payload []byte) error {
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint32(header, uint32(len(payload)))
@@ -45,7 +42,6 @@ func SendMessage(conn net.Conn, payload []byte) error {
 	return nil
 }
 
-// RecvMessage receives a length-prefixed message: 4 bytes big-endian length + payload.
 func RecvMessage(conn net.Conn) ([]byte, error) {
 	header, err := RecvAll(conn, 4)
 	if err != nil {

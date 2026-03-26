@@ -36,7 +36,6 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("server", "address")
 	v.BindEnv("log", "level")
 
-	// Bet-related env variables
 	v.BindEnv("nombre")
 	v.BindEnv("apellido")
 	v.BindEnv("documento")

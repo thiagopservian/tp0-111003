@@ -39,10 +39,6 @@ class Server:
             self.__handle_client_connection(client_sock)
 
     def __handle_client_connection(self, client_sock):
-        """
-        Read bet data from a specific client socket, store the bet,
-        send confirmation and close the socket.
-        """
         self._current_client_socket = client_sock
         try:
             data = recv_message(client_sock)
