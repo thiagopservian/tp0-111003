@@ -1,6 +1,6 @@
-# TP0 – Ejercicio 7
+# TP0 – Ejercicio 8
 
-Branch actual: ej7. Objetivo: cerrar el envío de apuestas por agencia, esperar el sorteo global y consultar ganadores por agencia.
+Branch actual: ej8. Objetivo: permitir aceptación y procesamiento en paralelo en servidor, manteniendo consistencia de persistencia y estado de sorteo.
 
 ## Cómo ejecutar
 
@@ -62,6 +62,16 @@ Servidor:
 
 No se realiza broadcast global. Cada cliente recibe solo sus DNIs ganadores.
 
+## Concurrencia y sincronización
+
+- El servidor acepta conexiones en el hilo principal y procesa cada cliente en un thread independiente.
+- Se usa un lock de persistencia para serializar acceso a `store_bets(...)` y `load_bets(...)`.
+- Se usa un lock de sockets activos para cerrar conexiones de forma ordenada durante shutdown.
+- Se usa `Condition` sobre el estado del sorteo para coordinar:
+	- notificaciones `FINISH`,
+	- transición a sorteo completado,
+	- consultas de ganadores que deben esperar hasta tener sorteo habilitado.
+
 ## Manejo de short read / short write
 
 - Cliente: `SendAll` y `RecvAll` en [client/common/protocol.go](client/common/protocol.go).
@@ -70,5 +80,5 @@ No se realiza broadcast global. Cada cliente recibe solo sus DNIs ganadores.
 ## Tests
 
 - En `tp0-tests`:
-	- `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej7.py -q`
+	- `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej8.py -q`
 

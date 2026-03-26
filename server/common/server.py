@@ -1,5 +1,6 @@
 import socket
 import logging
+import threading
 from common.utils import Bet, store_bets, load_bets, has_won
 from common.protocol import recv_message, send_message
 
@@ -7,29 +8,32 @@ from common.protocol import recv_message, send_message
 class Server:
     def __init__(self, port, listen_backlog, expected_agencies):
         self._running = True
-        self._current_client_socket = None
         self._expected_agencies = expected_agencies
         self._finished_agencies = set()
         self._draw_done = False
+        self._state_lock = threading.Lock()
+        self._draw_condition = threading.Condition(self._state_lock)
+        self._storage_lock = threading.Lock()
+        self._clients_lock = threading.Lock()
+        self._client_sockets = set()
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
 
     def shutdown(self):
-        self._running = False
-        self.__close_socket(self._current_client_socket, "client")
-        self._current_client_socket = None
+        with self._draw_condition:
+            self._running = False
+            self._draw_condition.notify_all()
+
         self.__close_socket(self._server_socket, "server")
 
+        with self._clients_lock:
+            sockets = list(self._client_sockets)
+
+        for sock in sockets:
+            self.__close_socket(sock, "client")
+
     def run(self):
-        """
-        Server loop
-
-        Server that accept a new connections and establishes a
-        communication with a client. After client communication
-        finishes, server starts to accept new connections again
-        """
-
         while self._running:
             try:
                 client_sock = self.__accept_new_connection()
@@ -38,10 +42,13 @@ class Server:
                     break
                 continue
 
-            self.__handle_client_connection(client_sock)
+            worker = threading.Thread(target=self.__handle_client_connection, args=(client_sock,), daemon=True)
+            worker.start()
 
     def __handle_client_connection(self, client_sock):
-        self._current_client_socket = client_sock
+        with self._clients_lock:
+            self._client_sockets.add(client_sock)
+
         try:
             data = recv_message(client_sock).decode('utf-8')
             lines = data.split('\n')
@@ -65,16 +72,10 @@ class Server:
             self.__send_response(client_sock, b"ERROR")
         finally:
             self.__close_socket(client_sock, "client")
-            self._current_client_socket = None
+            with self._clients_lock:
+                self._client_sockets.discard(client_sock)
 
     def __accept_new_connection(self):
-        """
-        Accept new connections
-
-        Function blocks until a connection to a client is made.
-        Then connection created is printed and returned
-        """
-
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
@@ -105,7 +106,8 @@ class Server:
             agency, first_name, last_name, document, birthdate, number = fields
             bets.append(Bet(agency=agency, first_name=first_name, last_name=last_name, document=document, birthdate=birthdate, number=number))
 
-        store_bets(bets)
+        with self._storage_lock:
+            store_bets(bets)
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {batch_count}')
         self.__send_response(client_sock, b"OK")
 
@@ -114,11 +116,14 @@ class Server:
             self.__send_response(client_sock, b"ERROR")
             return
 
-        self._finished_agencies.add(lines[1])
+        with self._draw_condition:
+            self._finished_agencies.add(lines[1])
 
-        if not self._draw_done and len(self._finished_agencies) >= self._expected_agencies:
-            self._draw_done = True
-            logging.info('action: sorteo | result: success')
+            if not self._draw_done and len(self._finished_agencies) >= self._expected_agencies:
+                self._draw_done = True
+                logging.info('action: sorteo | result: success')
+
+            self._draw_condition.notify_all()
 
         self.__send_response(client_sock, b"OK")
 
@@ -127,16 +132,21 @@ class Server:
             self.__send_response(client_sock, b"ERROR")
             return
 
-        if not self._draw_done:
-            self.__send_response(client_sock, b"PENDING")
-            return
+        with self._draw_condition:
+            while self._running and not self._draw_done:
+                self._draw_condition.wait(timeout=0.2)
+
+            if not self._draw_done:
+                self.__send_response(client_sock, b"PENDING")
+                return
 
         agency_id = int(lines[1])
         winners = []
         try:
-            for bet in load_bets():
-                if bet.agency == agency_id and has_won(bet):
-                    winners.append(str(bet.document))
+            with self._storage_lock:
+                for bet in load_bets():
+                    if bet.agency == agency_id and has_won(bet):
+                        winners.append(str(bet.document))
         except FileNotFoundError:
             winners = []
 
