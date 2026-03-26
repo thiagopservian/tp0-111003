@@ -58,7 +58,6 @@ func (c *Client) StartClientLoop() {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 
-		// TODO: Modify the send to avoid short-write
 		fmt.Fprintf(
 			c.conn,
 			"[CLIENT %v] Message N°%v\n",

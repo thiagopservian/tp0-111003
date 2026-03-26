@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 3
 
-Branch actual: ej3. Objetivo: validar automáticamente el echo server con `netcat` sin exponer puertos al host.
+Objetivo: validar automáticamente el echo server con `netcat` sin exponer puertos al host.
 
 ## Cómo correr el ejercicio
 
