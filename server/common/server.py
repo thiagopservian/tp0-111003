@@ -1,5 +1,7 @@
 import socket
 import logging
+from common.utils import Bet, store_bets
+from common.protocol import recv_message, send_message
 
 
 class Server:
@@ -19,15 +21,13 @@ class Server:
 
     def run(self):
         """
-        Dummy Server loop
+        Server loop
 
         Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
+        communication with a client. After client communication
+        finishes, server starts to accept new connections again
         """
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
         while self._running:
             try:
                 client_sock = self.__accept_new_connection()
@@ -40,22 +40,38 @@ class Server:
 
     def __handle_client_connection(self, client_sock):
         """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
+        Read bet data from a specific client socket, store the bet,
+        send confirmation and close the socket.
         """
         self._current_client_socket = client_sock
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
-        except OSError:
+            data = recv_message(client_sock)
+            fields = data.decode('utf-8').split('\n')
+
+            if len(fields) != 6:
+                logging.error(f'action: receive_bet | result: fail | error: expected 6 fields, got {len(fields)}')
+                send_message(client_sock, b"ERROR")
+                return
+
+            agency, first_name, last_name, document, birthdate, number = fields
+
+            bet = Bet(
+                agency=agency,
+                first_name=first_name,
+                last_name=last_name,
+                document=document,
+                birthdate=birthdate,
+                number=number
+            )
+            store_bets([bet])
+
+            logging.info(f'action: apuesta_almacenada | result: success | dni: {document} | numero: {number}')
+
+            send_message(client_sock, b"OK")
+
+        except (OSError, ConnectionError) as e:
             if self._running:
-                logging.error("action: receive_message | result: fail")
+                logging.error(f"action: receive_bet | result: fail | error: {e}")
         finally:
             self.__close_socket(client_sock, "client")
             self._current_client_socket = None
@@ -68,7 +84,6 @@ class Server:
         Then connection created is printed and returned
         """
 
-        # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
