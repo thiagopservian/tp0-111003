@@ -1,66 +1,57 @@
-# TP0 – Ejercicio 5
+# TP0 – Ejercicio 6
 
-Branch actual: ej5. Objetivo: implementar el caso de uso Lotería Nacional, enviando una apuesta desde cliente y almacenándola en servidor.
+Branch actual: ej6. Objetivo: enviar apuestas por lotes (batchs) desde archivos por agencia y procesarlas en servidor por batch.
 
-## Cómo correr el ejercicio
+## Cómo ejecutar
 
 - Generar compose: `./generar-compose.sh docker-compose-dev.yaml 5`.
-- Levantar entorno: `make docker-compose-up` (o `docker compose -f docker-compose-dev.yaml up -d`).
-- Ver logs: `make docker-compose-logs` (o `docker compose -f docker-compose-dev.yaml logs -f`).
+- Verificar datasets en `.data/agency-1.csv` ... `.data/agency-5.csv`.
+- Levantar entorno: `make docker-compose-up`.
+- Ver logs: `make docker-compose-logs`.
 - Bajar entorno: `make docker-compose-down`.
 
-### Variables de entorno de la apuesta (cliente)
+Los clientes montan `.data` como volumen (`./.data:/data`) y cada agencia N lee `/data/agency-N.csv`.
 
-Cada cliente/agencia envía una apuesta con:
+## Protocolo de comunicación implementado
 
-- `CLI_NOMBRE`
-- `CLI_APELLIDO`
-- `CLI_DOCUMENTO`
-- `CLI_NACIMIENTO` (formato `YYYY-MM-DD`)
-- `CLI_NUMERO`
+- Framing de transporte (cliente y servidor):
+	1. Header de 4 bytes (`uint32` big-endian) con largo del payload.
+	2. Payload con serialización manual.
+- Módulos:
+	- Cliente: [client/common/protocol.go](client/common/protocol.go)
+	- Servidor: [server/common/protocol.py](server/common/protocol.py)
 
-Además se usa `CLI_ID` como identificador de agencia.
+### Serialización del batch
 
-## Detalles de la solución
+- Línea 1: cantidad de apuestas del batch.
+- Líneas siguientes: una apuesta por línea con formato:
 
-### Modelo de comunicación / protocolo
+`agencia|nombre|apellido|documento|nacimiento|numero`
 
-Se implementó un módulo de protocolo en ambos lados:
+## Lógica de batch
 
-- Cliente: [client/common/protocol.go](client/common/protocol.go)
-- Servidor: [server/common/protocol.py](server/common/protocol.py)
+- `batch.maxAmount` en [client/config.yaml](client/config.yaml) define el tamaño máximo por batch.
+- Valor por defecto: `64` (manteniendo paquetes por debajo de ~8kB en este escenario).
+- El cliente divide el archivo de la agencia en chunks de tamaño `batch.maxAmount` y envía cada chunk en una conexión.
+- El servidor valida que el batch esté bien formado y que todas las apuestas sean parseables.
 
-Formato de mensaje:
+## Respuesta y logs
 
-1. Header de 4 bytes big-endian con la longitud del payload.
-2. Payload en bytes con los campos serializados.
+- Si todo el batch se procesa correctamente:
+	- respuesta: `OK`
+	- log servidor: `action: apuesta_recibida | result: success | cantidad: N`
+- Si hay error en alguna apuesta del batch:
+	- respuesta: `ERROR`
+	- log servidor: `action: apuesta_recibida | result: fail | cantidad: N`
 
-Serialización de la apuesta (cliente → servidor):
+## Manejo de short read / short write
 
-`agency\nnombre\napellido\ndocumento\nnacimiento\nnumero`
-
-Respuesta del servidor:
-
-- `OK` si se almacenó correctamente.
-- `ERROR` si el formato es inválido.
-
-### Manejo de short read / short write
-
-- En cliente (`SendAll`/`RecvAll`) y servidor (`send_all`/`recv_all`) se itera hasta enviar/recibir todos los bytes esperados.
-- Con esto se evita asumir que un solo `send`/`recv` transfiere el mensaje completo.
-
-### Separación de responsabilidades
-
-- Capa de protocolo: framing y transferencia confiable de bytes.
-- Lógica de negocio cliente: construcción de apuesta y log de confirmación.
-- Lógica de negocio servidor: parseo, validación básica de 6 campos, creación de `Bet` y persistencia con `store_bets(...)`.
-
-### Logs requeridos
-
-- Cliente, al confirmar: `action: apuesta_enviada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
-- Servidor, al persistir: `action: apuesta_almacenada | result: success | dni: ${DNI} | numero: ${NUMERO}`.
+- Cliente: `SendAll` y `RecvAll` en [client/common/protocol.go](client/common/protocol.go).
+- Servidor: `send_all` y `recv_all` en [server/common/protocol.py](server/common/protocol.py).
+- Ambos buclean hasta transferir exactamente la cantidad esperada de bytes.
 
 ## Tests
 
-- En `tp0-tests`: `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej5.py -q`.
+- En `tp0-tests`:
+	- `REPO_PATH=/ruta/al/repo .venv/bin/pytest test_ej6.py -q`
 
