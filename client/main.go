@@ -43,10 +43,7 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("nacimiento")
 	v.BindEnv("numero")
 
-	// Try to read configuration from config file. If config file
-	// does not exist then ReadInConfig will fail but configuration
-	// can be loaded from the environment variables so we shouldn't
-	// return an error in that case
+
 	v.SetConfigFile("./config.yaml")
 	if err := v.ReadInConfig(); err != nil {
 		log.Debugf("Configuration could not be read from config file. Using env variables instead")
@@ -55,9 +52,7 @@ func InitConfig() (*viper.Viper, error) {
 	return v, nil
 }
 
-// InitLogger Receives the log level to be set in go-logging as a string. This method
-// parses the string and set the level to the logger. If the level string is not
-// valid an error is returned
+
 func InitLogger(logLevel string) error {
 	baseBackend := logging.NewLogBackend(os.Stdout, "", 0)
 	format := logging.MustStringFormatter(
