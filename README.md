@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 6
 
-Branch actual: ej6. Objetivo: enviar apuestas por lotes (batchs) desde archivos por agencia y procesarlas en servidor por batch.
+Objetivo: enviar apuestas por lotes (batchs) desde archivos por agencia y procesarlas en servidor por batch.
 
 ## Cómo ejecutar
 
