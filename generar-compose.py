@@ -7,7 +7,6 @@ def generate_compose(output_file, client_amount):
     lines.append("name: tp0")
     lines.append("services:")
 
-    # Server service
     lines.append("  server:")
     lines.append("    container_name: server")
     lines.append("    image: server:latest")
@@ -19,7 +18,6 @@ def generate_compose(output_file, client_amount):
     lines.append("    networks:")
     lines.append("      - testing_net")
 
-    # Client services
     for i in range(1, client_amount + 1):
         lines.append(f"")
         lines.append(f"  client{i}:")
@@ -35,7 +33,6 @@ def generate_compose(output_file, client_amount):
         lines.append(f"    depends_on:")
         lines.append(f"      - server")
 
-    # Network definition
     lines.append("")
     lines.append("networks:")
     lines.append("  testing_net:")
