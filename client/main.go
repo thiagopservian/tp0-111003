@@ -35,12 +35,7 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("id")
 	v.BindEnv("server", "address")
 	v.BindEnv("log", "level")
-
-	v.BindEnv("nombre")
-	v.BindEnv("apellido")
-	v.BindEnv("documento")
-	v.BindEnv("nacimiento")
-	v.BindEnv("numero")
+	v.BindEnv("batch", "maxAmount")
 
 
 	v.SetConfigFile("./config.yaml")
@@ -84,16 +79,12 @@ func main() {
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
 		ID:            v.GetString("id"),
-		Nombre:        v.GetString("nombre"),
-		Apellido:      v.GetString("apellido"),
-		Documento:     v.GetString("documento"),
-		Nacimiento:    v.GetString("nacimiento"),
-		Numero:        v.GetString("numero"),
+		BatchMaxAmount: v.GetInt("batch.maxAmount"),
 	}
 
 	client := common.NewClient(clientConfig)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	client.SendBet(ctx)
+	client.SendBatches(ctx)
 }

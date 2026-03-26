@@ -42,32 +42,45 @@ class Server:
         self._current_client_socket = client_sock
         try:
             data = recv_message(client_sock)
-            fields = data.decode('utf-8').split('\n')
+            batch_lines = data.decode('utf-8').split('\n')
+            batch_count = int(batch_lines[0])
+            bet_lines = batch_lines[1:]
 
-            if len(fields) != 6:
-                logging.error(f'action: receive_bet | result: fail | error: expected 6 fields, got {len(fields)}')
-                send_message(client_sock, b"ERROR")
+            if len(bet_lines) != batch_count:
+                logging.info(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_lines)}')
+                self.__send_response(client_sock, b"ERROR")
                 return
 
-            agency, first_name, last_name, document, birthdate, number = fields
+            bets = []
+            for line in bet_lines:
+                fields = line.split('|')
+                if len(fields) != 6:
+                    logging.info(f'action: apuesta_recibida | result: fail | cantidad: {batch_count}')
+                    self.__send_response(client_sock, b"ERROR")
+                    return
 
-            bet = Bet(
-                agency=agency,
-                first_name=first_name,
-                last_name=last_name,
-                document=document,
-                birthdate=birthdate,
-                number=number
-            )
-            store_bets([bet])
+                agency, first_name, last_name, document, birthdate, number = fields
+                bet = Bet(
+                    agency=agency,
+                    first_name=first_name,
+                    last_name=last_name,
+                    document=document,
+                    birthdate=birthdate,
+                    number=number
+                )
+                bets.append(bet)
 
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {document} | numero: {number}')
-
-            send_message(client_sock, b"OK")
+            store_bets(bets)
+            logging.info(f'action: apuesta_recibida | result: success | cantidad: {batch_count}')
+            self.__send_response(client_sock, b"OK")
 
         except (OSError, ConnectionError) as e:
             if self._running:
-                logging.error(f"action: receive_bet | result: fail | error: {e}")
+                logging.error(f"action: apuesta_recibida | result: fail | cantidad: 0 | error: {e}")
+                self.__send_response(client_sock, b"ERROR")
+        except Exception:
+            logging.info('action: apuesta_recibida | result: fail | cantidad: 0')
+            self.__send_response(client_sock, b"ERROR")
         finally:
             self.__close_socket(client_sock, "client")
             self._current_client_socket = None
@@ -94,3 +107,9 @@ class Server:
             logging.info(f'action: close_socket | result: success | socket: {socket_name}')
         except OSError as e:
             logging.error(f'action: close_socket | result: fail | socket: {socket_name} | error: {e}')
+
+    def __send_response(self, sock, payload):
+        try:
+            send_message(sock, payload)
+        except OSError:
+            pass
