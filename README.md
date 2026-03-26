@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 2
 
-Branch actual: ej2. Objetivo: que cliente y servidor lean configuración montada como volumen, evitando reconstruir imágenes al cambiar parámetros.
+Objetivo: que cliente y servidor lean configuración montada como volumen, evitando reconstruir imágenes al cambiar parámetros.
 
 ## Cómo correr el ejercicio
 
