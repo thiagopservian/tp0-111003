@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -98,6 +99,12 @@ func (c *Client) SendBatches(ctx context.Context) {
 			return
 		}
 	}
+
+	if err := c.sendFinish(ctx); err != nil {
+		return
+	}
+
+	c.queryWinners(ctx)
 }
 
 func (c *Client) sendBatch(ctx context.Context, batch [][]string) error {
@@ -106,7 +113,7 @@ func (c *Client) sendBatch(ctx context.Context, batch [][]string) error {
 	}
 	defer c.closeClientSocket()
 
-	payload := c.serializeBatch(batch)
+	payload := c.serializeBatchMessage(batch)
 	if err := SendMessage(c.conn, []byte(payload)); err != nil {
 		if ctx.Err() != nil {
 			log.Infof("action: shutdown | result: success | client_id: %v | signal: SIGTERM", c.config.ID)
@@ -135,8 +142,9 @@ func (c *Client) sendBatch(ctx context.Context, batch [][]string) error {
 	return nil
 }
 
-func (c *Client) serializeBatch(batch [][]string) string {
+func (c *Client) serializeBatchMessage(batch [][]string) string {
 	lines := make([]string, 0, len(batch)+1)
+	lines = append(lines, "BATCH")
 	lines = append(lines, strconv.Itoa(len(batch)))
 
 	for _, row := range batch {
@@ -151,6 +159,79 @@ func (c *Client) serializeBatch(batch [][]string) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (c *Client) sendFinish(ctx context.Context) error {
+	response, err := c.sendRequest(ctx, "FINISH\n"+c.config.ID)
+	if err != nil {
+		return err
+	}
+
+	if response != "OK" {
+		return fmt.Errorf("finish rejected")
+	}
+
+	return nil
+}
+
+func (c *Client) queryWinners(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("action: shutdown | result: success | client_id: %v | signal: SIGTERM", c.config.ID)
+			return
+		default:
+		}
+
+		response, err := c.sendRequest(ctx, "WINNERS\n"+c.config.ID)
+		if err != nil {
+			return
+		}
+
+		if response == "PENDING" {
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		parts := strings.Split(response, "|")
+		if len(parts) < 2 || parts[0] != "WINNERS" {
+			return
+		}
+
+		count, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return
+		}
+
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", count)
+		return
+	}
+}
+
+func (c *Client) sendRequest(ctx context.Context, payload string) (string, error) {
+	if err := c.createClientSocket(); err != nil {
+		return "", err
+	}
+	defer c.closeClientSocket()
+
+	if err := SendMessage(c.conn, []byte(payload)); err != nil {
+		if ctx.Err() != nil {
+			log.Infof("action: shutdown | result: success | client_id: %v | signal: SIGTERM", c.config.ID)
+			return "", nil
+		}
+		return "", err
+	}
+
+	response, err := RecvMessage(c.conn)
+	if err != nil {
+		if ctx.Err() != nil {
+			log.Infof("action: shutdown | result: success | client_id: %v | signal: SIGTERM", c.config.ID)
+			return "", nil
+		}
+		return "", err
+	}
+
+	return string(response), nil
 }
 
 func (c *Client) loadAgencyBets() ([][]string, error) {

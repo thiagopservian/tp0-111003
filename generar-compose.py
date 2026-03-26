@@ -13,6 +13,7 @@ def generate_compose(output_file, client_amount):
     lines.append("    entrypoint: [\"python3\", \"/main.py\"]")
     lines.append("    environment:")
     lines.append("      - PYTHONUNBUFFERED=1")
+    lines.append(f"      - SERVER_EXPECTED_AGENCIES={client_amount}")
     lines.append("    volumes:")
     lines.append("      - ./server/config.ini:/config.ini")
     lines.append("    networks:")
