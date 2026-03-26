@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 4
 
-Branch actual: ej4. Objetivo: finalizar cliente y servidor de forma graceful al recibir SIGTERM, cerrando sockets y registrando logs de cierre.
+Objetivo: finalizar cliente y servidor de forma graceful al recibir SIGTERM, cerrando sockets y registrando logs de cierre.
 
 ## Cómo correr el ejercicio
 
