@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 7
 
-Branch actual: ej7. Objetivo: cerrar el envío de apuestas por agencia, esperar el sorteo global y consultar ganadores por agencia.
+Objetivo: cerrar el envío de apuestas por agencia, esperar el sorteo global y consultar ganadores por agencia.
 
 ## Cómo ejecutar
 
@@ -37,7 +37,6 @@ Módulos:
 	- `WINNERS\n<agency_id>`
 
 ### Respuestas
-
 - `OK`
 - `ERROR`
 - `PENDING` cuando todavía no se completó el sorteo
@@ -57,10 +56,24 @@ Servidor:
 - El número esperado de agencias se recibe por `SERVER_EXPECTED_AGENCIES` desde el compose generado.
 - Cuando recibe todas las notificaciones registra:
 	- `action: sorteo | result: success`
-- Recién desde ese momento responde consultas de ganadores.
+- Mientras el sorteo global no esté habilitado (`_draw_done = False`), responde `PENDING` a `WINNERS`.
+- Recién desde que `_draw_done = True` responde `WINNERS|...` con resultados.
 - Para cada consulta filtra por agencia y calcula ganadores usando `load_bets(...)` y `has_won(...)`.
 
 No se realiza broadcast global. Cada cliente recibe solo sus DNIs ganadores.
+
+## Aclaración sobre lock y no bloqueo
+
+En este ejercicio 7 no se agregó un `lock`.
+
+La solución de ej7 evita bloquear clientes de esta forma:
+
+- El servidor procesa cada conexión y, si todavía no se alcanzó la cantidad esperada de `FINISH`, responde inmediatamente `PENDING` ante `WINNERS`.
+- El cliente hace polling (reintentos) de `WINNERS` hasta que el servidor responde resultados.
+
+Es decir: hay espera activa coordinada por protocolo (`PENDING`), no sincronización con primitivas de concurrencia.
+
+Los mecanismos de sincronización explícitos (`Lock`/`Condition`) se incorporan en ej8, cuando el servidor pasa a atender conexiones en paralelo.
 
 ## Manejo de short read / short write
 
