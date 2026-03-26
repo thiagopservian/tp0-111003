@@ -1,6 +1,6 @@
 # TP0 – Ejercicio 5
 
-Branch actual: ej5. Objetivo: implementar el caso de uso Lotería Nacional, enviando una apuesta desde cliente y almacenándola en servidor.
+Objetivo: implementar el caso de uso Lotería Nacional, enviando una apuesta desde cliente y almacenándola en servidor.
 
 ## Cómo correr el ejercicio
 
